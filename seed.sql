@@ -1,3 +1,5 @@
+USE staffDB;
+
 INSERT INTO department (name)
 VALUES ('marketing'), ('sales'), ('engineering');
 

@@ -39,12 +39,13 @@ const mainMenu = () => {
           'Add Department',
           'Remove Department', //Bonus
           'View Utilized Department Budget By Department', // combined salaries by dept
+          new inquirer.Separator('----------------------------------------------'),
         ],
       })
       .then((answer) => {
         switch (answer.action) {
           case 'View All Employees':
-            // viewAllEmp();
+            viewAllEmp();
             break;
           case 'View All Employees By Department':
             // doAThing();
@@ -91,3 +92,13 @@ const mainMenu = () => {
         }
       });
   };
+
+const viewAllEmp = () => {
+    const query = "SELECT * FROM employee";
+    connection.query(query, (err, res) => {
+        const table = cTable.getTable(res);
+        console.log('\n\n' + table);
+    });
+    console.log('\n');
+    mainMenu();
+}
