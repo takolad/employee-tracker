@@ -48,13 +48,13 @@ const mainMenu = () => {
             viewAllEmp();
             break;
           case 'View All Employees By Department':
-            // doAThing();
+            viewAllEmpDept();
             break;
           case 'View All Employees By Manager':
             // doAThing();
             break;
           case 'Add Employee':
-            // doAThing();
+            // addEmp();
             break;
           case 'Remove Employee':
             // doAThing();
@@ -93,8 +93,11 @@ const mainMenu = () => {
       });
   };
 
+  // don't know how to get manager name instead of id
 const viewAllEmp = () => {
-    const query = "SELECT * FROM employee";
+    const query = "SELECT emp.id, emp.first_name, emp.last_name, role.title, dept.name AS department, role.salary, emp.manager_id AS manager " +
+    "FROM employee AS emp LEFT JOIN role ON emp.role_id = role.id " +
+    "LEFT JOIN department AS dept ON role.department_id = dept.id;";
     connection.query(query, (err, res) => {
         const table = cTable.getTable(res);
         console.log('\n\n' + table);
@@ -102,3 +105,71 @@ const viewAllEmp = () => {
     console.log('\n');
     mainMenu();
 }
+
+const viewAllEmpDept = () => {
+    const query = "Select name FROM department";
+    const deptArray = [];
+    connection.query(query, (err,res) => {
+        res.forEach(({name}) => {
+            name = name.charAt(0).toUpperCase() + name.slice(1);
+            deptArray.push(name);
+            console.log(name);
+            console.log(deptArray.length);
+        })
+    })
+    inquirer
+      .prompt({
+          name: 'dept',
+          type: 'list',
+          message: 'Select a Department',
+          choices: deptArray,// give it an array
+      })
+      .then((answer) => {
+        query = "SELECT * FROM employee WHERE department = ?";
+        connection.query(query, {department : answer.dept},(err, res) => {
+            const table = cTable.getTable(res);
+            console.log('\n\n' + table);
+        });
+        console.log('\n');
+        mainMenu();
+      })
+  }
+
+    // Add an Employee
+    const addEmp = () => {
+      const roleArray = [];
+      const managerArray = [];
+      inquirer
+        .prompt({
+            type: 'input',
+            name: 'firstN',
+            message: 'What is the employee\'s first name?',
+          },
+          {
+            type: 'input',
+            name: 'lastN',
+            message: 'What is the employee\'s last name?',
+          },
+          {
+            type: 'list',
+            name: 'role',
+            message: 'What is the employee\'s role?',
+            choices: roleArray,
+          },
+          {
+            type: 'list',
+            name: 'manager',
+            message: 'Who is the employee\'s manager?',
+            coices: managerArray,
+          },
+        )
+        .then((answer) => {
+          const query = "INSERT INTO employee ('first_name', 'last_name', 'role_id', 'manager_id') "
+          + "VALUES (?, ?, ?, ?)"
+          connection.query(query, [ answer.firstN, answer.lastN, answer.role, answer.manager ],(err, res) => {
+            if (err) throw err;
+            const table = cTable.getTable(res);
+          });
+          mainMenu();
+        })
+    }
