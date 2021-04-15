@@ -51,41 +51,44 @@ const mainMenu = () => {
           viewAllEmpDept();
           break;
         case 'View All Employees By Manager': // Bonus
-          // doAThing();
+          doAThing();
           break;
         case 'Add Employee':
           addEmp();
           break;
         case 'Remove Employee': // Bonus
-          // doAThing();
+          doAThing();
           break;
         case 'Update Employee Role':
-          // doAThing();
+          doAThing();
           break;
         case 'Update Employee Manager': // Bonus
-          // doAThing();
+          doAThing();
           break;
         case 'View All Roles':
-          // doAThing();
+          // viewRoles();
+          (async () => {
+            const roleArr = await getRoles();
+            console.log(roleArr);
+          })();
           break;
         case 'Add Role':
-          // doAThing();
+          doAThing();
           break;
         case 'Remove Role': // Bonus
-          // doAThing();
+          doAThing();
           break;
         case 'View All Departments':
-          let depts = getDepartments();
-          console.log(depts); // undefined - because of sync?
+          viewDepartments();
           break;
         case 'Add Department':
-          // doAThing();
+          doAThing();
           break;
         case 'Remove Department': // Bonus
-          // doAThing();
+          doAThing();
           break;
         case 'View Utilized Department Budget By Department': // Bonus
-          // doAThing();
+          doAThing();
           break;
         default:
           console.log(`Invalid action: ${answer.action}`);
@@ -107,7 +110,7 @@ const viewAllEmp = () => {
 }
 
 const viewAllEmpDept = () => {
-  const deptArray = getDepartments(); // doesn't work, breaks everything below
+  const deptArray = viewDepartments(); // doesn't work, breaks everything below
   inquirer
     .prompt({
       name: 'dept',
@@ -127,14 +130,16 @@ const viewAllEmpDept = () => {
 
 // Add an Employee
 const addEmp = () => {
+  // these don't work
   const roleArray = getRoles();
+  console.log(roleArray);
   const managerArray = getManagers();
   inquirer
     .prompt({
       type: 'input',
       name: 'firstN',
       message: 'What is the employee\'s first name?',
-    },
+      },
       {
         type: 'input',
         name: 'lastN',
@@ -151,8 +156,9 @@ const addEmp = () => {
         name: 'manager',
         message: 'Who is the employee\'s manager?',
         coices: managerArray,
-        enumerate: function (manager) {
-          // 
+        enumerate: function (manager) { // do I need to do this?
+          // turn the title into the role id number...
+          // ...er get the related id?
         }
       },
     )
@@ -162,11 +168,13 @@ const addEmp = () => {
       connection.query(query, [answer.firstN, answer.lastN, answer.role, answer.manager], (err, res) => {
         if (err) throw err;
         console.log(`Added ${employeeName} to the database`);
+        mainMenu();
       });
-    }).then(mainMenu());
+    });
 }
 
 const addRole = () => {
+  const roleArr = [];
   inquirer
     .prompt({
       type: 'input',
@@ -193,21 +201,45 @@ const getManagers = () => {
   });
 }
 
-const getRoles = () => {
+const viewRoles = () => {
   const query = "SELECT title FROM role";
+  const roleArr = [];
   connection.query(query, (err, res) => {
-    return res;
+    res.forEach((data) => {
+      roleArr.push(data.title);
+    })
+    // inquire here!?
+    console.cTable(roleArr);
+    mainMenu();
+  });
+}
+// praise be to stackoverflow
+function getRoles() {
+  const roleArr = [];
+  return new Promise((resolve, reject) => {
+    const query = "SELECT title FROM role";
+    connection.query(query, (err, res) => {
+      res.forEach((data) => {
+        roleArr.push(data.title);
+      })
+      return err ? reject(err) : resolve(roleArr);
+    });
   });
 }
 
-function getDepartments() {
+function viewDepartments() {
   const query = "SELECT name FROM department";
   const deptArr = [];
   connection.query(query, (err, res) => {
     res.forEach((data) => {
       deptArr.push(data.name);
     })
-    console.log(deptArr);
-    return deptArr; // executes immediately?
+    console.log(deptArr + '\n');
+    mainMenu();
   });
+}
+
+function doAThing() {
+  console.log("\nNot yet implemented\n");
+  mainMenu();
 }
