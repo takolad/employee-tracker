@@ -79,7 +79,15 @@ const mainMenu = () => {
           doAThing();
           break;
         case 'View All Departments':
-          viewDepartments();
+          (async () => {
+            let deptArr = await getDepartments();
+            deptArr.forEach((data, idx) => {
+              // need to capitalize first letter
+              deptArr[idx] = {'Department':data};
+            })
+            console.table(deptArr);
+            mainMenu();
+          })();
           break;
         case 'Add Department':
           doAThing();
@@ -110,7 +118,9 @@ const viewAllEmp = () => {
 }
 
 const viewAllEmpDept = () => {
-  const deptArray = viewDepartments(); // doesn't work, breaks everything below
+  (async () => {
+    const deptArray = await getDepartments();
+
   inquirer
     .prompt({
       name: 'dept',
@@ -126,6 +136,7 @@ const viewAllEmpDept = () => {
         mainMenu();
       });
     })
+  })();
 }
 
 // Add an Employee
@@ -227,15 +238,16 @@ function getRoles() {
   });
 }
 
-function viewDepartments() {
-  const query = "SELECT name FROM department";
+function getDepartments() {
   const deptArr = [];
-  connection.query(query, (err, res) => {
-    res.forEach((data) => {
-      deptArr.push(data.name);
-    })
-    console.log(deptArr + '\n');
-    mainMenu();
+  return new Promise((resolve, reject) => {
+    const query = "SELECT name FROM department";
+    connection.query(query, (err, res) => {
+      res.forEach((data) => {
+        deptArr.push(data.name);
+      })
+      return err ? reject(err) : resolve(deptArr);
+    });
   });
 }
 
