@@ -91,7 +91,11 @@ const mainMenu = () => {
           doAThing();
           break;
         case 'View Utilized Department Budget By Department': // Bonus
-          doAThing();
+          // doAThing();
+          (async() => {
+            let nameToId = await getIdByName("None");
+            console.log(nameToId);
+          })();
           break;
         default:
           console.log(`Invalid action: ${answer.action}`);
@@ -131,18 +135,14 @@ const viewAllEmpDept = () => {
         choices: depts,
       })
       .then((answer) => {
-        let deptText = answer.dept;
-        (async () => {
-          const deptId = await getDeptId(deptText);
-        
           const query = "SELECT e.id, e.first_name, e.last_name, r.title, d.name AS department, " +
           "r.salary, concat(m.first_name, ' ', m.last_name) AS manager " +
           "FROM employee AS e LEFT JOIN role AS r ON e.role_id = r.id " +
           "LEFT JOIN department AS d ON r.department_id = d.id " +
           "LEFT JOIN employee m ON m.id = e.manager_id " +
-          `WHERE d.id = ${deptId} ORDER BY e.id`;
+          `WHERE d.name = ? ORDER BY e.id`;
 
-          connection.query(query, (err, res) => {
+          connection.query(query, answer.dept, (err, res) => {
             if (err) throw err;
             const table = cTable.getTable(res);
             if(res[0]) {
@@ -152,54 +152,64 @@ const viewAllEmpDept = () => {
             }
             mainMenu();
           });
-        })();
-      })
-  })();
+        })
+      })();
 }
 
 // Add an Employee
 const addEmp = () => {
-  // these don't work
-  const roleArray = getRoles(); // returns pending promise
-  console.log(roleArray);
-  const managerArray = getManagers();
-  inquirer
-    .prompt({
-      type: 'input',
-      name: 'firstN',
-      message: 'What is the employee\'s first name?',
-      },
-      {
+  (async () => {
+    const roleArray = await getRoles();
+    const managerArray = await getManagers();
+    inquirer
+      .prompt([{
         type: 'input',
-        name: 'lastN',
-        message: 'What is the employee\'s last name?',
-      },
-      {
-        type: 'list',
-        name: 'role',
-        message: 'What is the employee\'s role?',
-        choices: roleArray,
-      },
-      {
-        type: 'list',
-        name: 'manager',
-        message: 'Who is the employee\'s manager?',
-        coices: managerArray,
-        enumerate: function (manager) { // do I need to do this?
-          // turn the title into the role id number...
-          // ...er get the related id?
+        name: 'firstN',
+        message: 'What is the employee\'s first name?',
+        },
+        {
+          type: 'input',
+          name: 'lastN',
+          message: 'What is the employee\'s last name?',
+        },
+        {
+          type: 'list',
+          name: 'role',
+          message: 'What is the employee\'s role?',
+          choices: roleArray, // to >> role.title
+        },
+        {
+          type: 'list',
+          name: 'manager',
+          message: 'Who is the employee\'s manager?',
+          choices: managerArray, // answer needs to be converted to e.id
         }
-      },
-    )
-    .then((answer) => {
-      const query = "INSERT INTO employee ('first_name', 'last_name', 'role_id', 'manager_id') "
-        + "VALUES (?, ?, ?, ?)"
-      connection.query(query, [answer.firstN, answer.lastN, answer.role, answer.manager], (err, res) => {
-        if (err) throw err;
-        console.log(`Added ${employeeName} to the database`);
-        mainMenu();
-      });
-    });
+      ])
+      .then((answer) => {
+        (async () => {
+          const managerId = await getIdByName(answer.manager);
+          const roleId = await getRoleIdByTitle(answer.role);
+          if (managerId === '') {
+            const query = "INSERT INTO employee (first_name, last_name, role_id) "
+              + "VALUES (?, ?, ?)";
+            connection.query(query, [answer.firstN, answer.lastN, roleId], (err, res) => {
+              if (err) throw err;
+              console.log(`\nAdded ${answer.firstN + ' ' + answer.lastN} to the database\n`);
+              mainMenu();
+            });
+          } else if (!isNaN(managerId)){
+            const query = "INSERT INTO employee (first_name, last_name, role_id, manager_id) "
+              + "VALUES (?, ?, ?, ?)"
+            connection.query(query, [answer.firstN, answer.lastN, roleId, managerId], (err, res) => {
+              if (err) throw err;
+              console.log(`\nAdded ${answer.firstN + ' ' + answer.lastN} to the database\n`);
+              mainMenu();
+            });
+          }
+        })();
+        })
+  })();
+
 }
 
 const addRole = () => {
@@ -223,11 +233,19 @@ const addRole = () => {
 // hoping to return a array of objects with 3 properties
   // ex: manager[0].fName, manager[0].lName, manager[0].id
 const getManagers = () => {
-  // has to be more efficient way to pass role_id
-  const query = "SELECT first_name, last_name, id FROM employee WHERE role_id = 1"
-  connection.query(query, (err, res) => {
-    return res;
-  });
+  const managerArr = [];
+  return new Promise((resolve, reject) => {
+    const query = "SELECT DISTINCT concat(m.first_name, ' ', m.last_name) AS manager " +
+    "FROM employee AS m " +
+    "JOIN employee AS e ON m.id = e.manager_id";
+    connection.query(query, (err, res) => {
+      managerArr.push('None');
+      res.forEach((data) => {
+        managerArr.push(data.manager);
+      })
+      return err ? reject(err) : resolve(managerArr);
+    });
+  })
 }
 
 const viewRoles = () => {
@@ -253,7 +271,7 @@ function getRoles() {
       })
       return err ? reject(err) : resolve(roleArr);
     });
-  });
+  })
 }
 
 function getDepartments() {
@@ -274,11 +292,26 @@ function doAThing() {
   mainMenu();
 }
 
-function getDeptId(deptName) {
+// returns id of matching name or empty string if None is selected
+function getIdByName(name) {
   return new Promise((resolve, reject) => {
-    const query = "SELECT id FROM department WHERE name = ?";
-    connection.query(query, deptName, (err, res) => {
-      return err ? reject(err) : resolve(res[0].id);
+    if (name !== 'None') {
+      let nameArr = name.split(' ');
+      query = "SELECT id FROM employee " +
+      "WHERE first_name = ? and last_name = ?";
+      connection.query(query, [ nameArr[0], nameArr[1] ], (err, res) => {
+        return (err) ? reject(err) : resolve(res[0].id);
+      });
+    } else resolve('');
+  });
+}
+
+function getRoleIdByTitle(title) {
+  return new Promise((resolve, reject) => {
+    query = "SELECT id FROM role " +
+    "WHERE title = ?";
+    connection.query(query, [ title ], (err, res) => {
+      return (err) ? reject(err) : resolve(res[0].id);
     });
   });
 }
