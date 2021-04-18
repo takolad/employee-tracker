@@ -48,10 +48,10 @@ const mainMenu = () => {
           viewAllEmp();
           break;
         case 'View All Employees By Department':
-          viewAllEmpDept();
+          viewAllEmpByDept();
           break;
-        case 'View All Employees By Manager': // Bonus
-          doAThing();
+        case 'View All Employees By Manager':
+          viewAllEmpByManager();
           break;
         case 'Add Employee':
           addEmp();
@@ -69,20 +69,13 @@ const mainMenu = () => {
           viewRoles();
           break;
         case 'Add Role':
-          doAThing();
+          addRole();
           break;
         case 'Remove Role': // Bonus
           doAThing();
           break;
         case 'View All Departments':
-          (async () => {
-            let deptArr = await getDepartments();
-            deptArr.forEach((data, idx) => {
-              deptArr[idx] = {'\ndepartment':data.name};
-            })
-            console.table(deptArr);
-            mainMenu();
-          })();
+          viewDepartments();
           break;
         case 'Add Department':
           doAThing();
@@ -91,11 +84,7 @@ const mainMenu = () => {
           doAThing();
           break;
         case 'View Utilized Department Budget By Department': // Bonus
-          // doAThing();
-          (async() => {
-            let nameToId = await getIdByName("None");
-            console.log(nameToId);
-          })();
+          doAThing();
           break;
         default:
           console.log(`Invalid action: ${answer.action}`);
@@ -122,8 +111,7 @@ const viewAllEmp = () => {
   });
 }
 
-
-const viewAllEmpDept = () => {
+const viewAllEmpByDept = () => {
   (async () => {
     let deptArr = await getDepartments();
     let depts = deptArr;
@@ -156,11 +144,45 @@ const viewAllEmpDept = () => {
       })();
 }
 
+const viewAllEmpByManager = () => {
+  (async () => {
+    const managers = await getManagers();
+    inquirer
+      .prompt({
+        name: 'manager',
+        type: 'list',
+        message: 'Select a Manager',
+        choices: managers,
+      })
+      .then((answer) => {
+          let manager = answer.manager.split(' ');
+          const query = "SELECT e.id, e.first_name, e.last_name, r.title, d.name AS department, " +
+          "r.salary, concat(m.first_name, ' ', m.last_name) AS manager " +
+          "FROM employee AS e LEFT JOIN role AS r ON e.role_id = r.id " +
+          "LEFT JOIN department AS d ON r.department_id = d.id " +
+          "LEFT JOIN employee m ON m.id = e.manager_id " +
+          `WHERE m.first_name = ? AND m.last_name = ? ORDER BY e.id`;
+
+          connection.query(query, [ manager[0], manager[1] ], (err, res) => {
+            if (err) throw err;
+            const table = cTable.getTable(res);
+            if(res[0]) {
+              console.log('\n\n' + table);
+            } else {
+              console.log("\nNo matches found.\n");
+            }
+            mainMenu();
+          });
+        })
+      })();
+}
+
 // Add an Employee
 const addEmp = () => {
   (async () => {
     const roleArray = await getRoles();
     const managerArray = await getManagers();
+    managerArray.unshift('None'); // Adds None to the array as an option
     inquirer
       .prompt([{
         type: 'input',
@@ -187,7 +209,9 @@ const addEmp = () => {
       ])
       .then((answer) => {
         (async () => {
+          // gets id of argued name
           const managerId = await getIdByName(answer.manager);
+          // gets id of argued role
           const roleId = await getRoleIdByTitle(answer.role);
           if (managerId === '') {
             const query = "INSERT INTO employee (first_name, last_name, role_id) "
@@ -213,25 +237,53 @@ const addEmp = () => {
 }
 
 const addRole = () => {
-  const roleArr = [];
-  inquirer
-    .prompt({
-      type: 'input',
-      name: 'firstN',
-      message: 'What is the employee\'s first name?',
-    }
-    )
-    .then((answer) => {
-      const query = "INSERT INTO role ('title', 'salary'"
-      connection.query(query, [answer.firstN, answer.lastN, answer.role, answer.manager], (err, res) => {
-        if (err) throw err;
-        console.log(`Added ${employeeName} to the database`);
-      });
-    }).then(mainMenu());
+  (async() => {
+    // get array of departments
+    const deptArr = await getDepartments();
+    deptArr.unshift('None');
+    inquirer
+      .prompt([
+        {
+          type: 'input',
+          name: 'role',
+          message: 'What role would you like to add?',
+        },
+        {
+          type: 'number',
+          name: 'salary',
+          message: 'What is the salary for this role?'
+        },
+        {
+          type: 'list',
+          name: 'dept',
+          message: 'Which department does this role belong to?',
+          choices: deptArr
+        }
+      ])
+      .then((answer) => {
+        if (answer.dept === 'None') {
+          const query = "INSERT INTO role (title, salary) VALUES (?, ?)";
+          connection.query(query, [answer.role, answer.salary], (err, res) => {
+            if (err) throw err;
+            console.log(`\nAdded '${answer.role}' role to the database`);
+            mainMenu();
+          });
+        } else {
+          (async() => {
+            // get id of matching dept
+            const deptId = await getDeptIdByName(answer.dept);
+            const query = "INSERT INTO role (title, salary, department_id) VALUES (?, ?, ?)";
+            connection.query(query, [answer.role, answer.salary, deptId], (err, res) => {
+              if (err) throw err;
+              console.log(`\nAdded '${answer.role}' role to the database\n`);
+              mainMenu();
+            });
+          })();
+        }
+      })
+  })();
 }
 
-// hoping to return a array of objects with 3 properties
-  // ex: manager[0].fName, manager[0].lName, manager[0].id
 const getManagers = () => {
   const managerArr = [];
   return new Promise((resolve, reject) => {
@@ -239,7 +291,6 @@ const getManagers = () => {
     "FROM employee AS m " +
     "JOIN employee AS e ON m.id = e.manager_id";
     connection.query(query, (err, res) => {
-      managerArr.push('None');
       res.forEach((data) => {
         managerArr.push(data.manager);
       })
@@ -249,18 +300,15 @@ const getManagers = () => {
 }
 
 const viewRoles = () => {
-  const query = "SELECT title FROM role";
-  return new Promise((resolve, reject) => {
     const query = "SELECT title FROM role";
     connection.query(query, (err, res) => {
-      if (err) reject(err);
+      if (err) throw(err);
       const table = cTable.getTable(res);
-      resolve(console.log('\n\n' + table));
+      console.log('\n\n' + table);
       mainMenu();
     });
-  });
 }
-// praise be to stackoverflow
+
 function getRoles() {
   const roleArr = [];
   return new Promise((resolve, reject) => {
@@ -272,6 +320,19 @@ function getRoles() {
       return err ? reject(err) : resolve(roleArr);
     });
   })
+}
+
+function viewDepartments() {
+    const query = "SELECT id, name FROM department";
+    const deptArray = [];
+    connection.query(query, (err, res) => {
+      res.forEach((data) => {
+        deptArray.push({departments:data.name});
+      })
+      const table = cTable.getTable(deptArray);
+      console.log('\n' + table);
+      mainMenu();
+    });
 }
 
 function getDepartments() {
@@ -311,6 +372,16 @@ function getRoleIdByTitle(title) {
     query = "SELECT id FROM role " +
     "WHERE title = ?";
     connection.query(query, [ title ], (err, res) => {
+      return (err) ? reject(err) : resolve(res[0].id);
+    });
+  });
+}
+
+function getDeptIdByName(name) {
+  return new Promise((resolve, reject) => {
+    query = "SELECT id FROM department " +
+    "WHERE name = ?";
+    connection.query(query, [ name ], (err, res) => {
       return (err) ? reject(err) : resolve(res[0].id);
     });
   });
