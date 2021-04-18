@@ -66,11 +66,7 @@ const mainMenu = () => {
           doAThing();
           break;
         case 'View All Roles':
-          // viewRoles();
-          (async () => {
-            const roleArr = await getRoles();
-            console.log(roleArr);
-          })();
+          viewRoles();
           break;
         case 'Add Role':
           doAThing();
@@ -82,8 +78,7 @@ const mainMenu = () => {
           (async () => {
             let deptArr = await getDepartments();
             deptArr.forEach((data, idx) => {
-              // need to capitalize first letter
-              deptArr[idx] = {'Department':data};
+              deptArr[idx] = {'\ndepartment':data.name};
             })
             console.table(deptArr);
             mainMenu();
@@ -105,44 +100,67 @@ const mainMenu = () => {
     });
 };
 
-// don't know how to get manager name instead of id
 const viewAllEmp = () => {
-  const query = "SELECT emp.id, emp.first_name, emp.last_name, role.title, dept.name AS department, role.salary, emp.manager_id AS manager " +
-    "FROM employee AS emp LEFT JOIN role ON emp.role_id = role.id " +
-    "LEFT JOIN department AS dept ON role.department_id = dept.id;";
+  const query = "SELECT e.id, e.first_name, e.last_name, r.title, d.name AS department, " +
+  "r.salary, concat(m.first_name, ' ', m.last_name) AS manager " +
+  "FROM employee AS e LEFT JOIN role AS r ON e.role_id = r.id " +
+  "LEFT JOIN department AS d ON r.department_id = d.id " +
+  "LEFT JOIN employee m ON m.id = e.manager_id";
   connection.query(query, (err, res) => {
+    if (err) throw err;
     const table = cTable.getTable(res);
-    console.log('\n\n' + table);
+    if(res[0]) {
+      console.log('\n\n' + table);
+    } else {
+      console.log("\nNo matches found.\n");
+    }
     mainMenu();
   });
 }
 
+
 const viewAllEmpDept = () => {
   (async () => {
-    const deptArray = await getDepartments();
+    let deptArr = await getDepartments();
+    let depts = deptArr;
+    inquirer
+      .prompt({
+        name: 'dept',
+        type: 'list',
+        message: 'Select a Department',
+        choices: depts,
+      })
+      .then((answer) => {
+        let deptText = answer.dept;
+        (async () => {
+          const deptId = await getDeptId(deptText);
+        
+          const query = "SELECT e.id, e.first_name, e.last_name, r.title, d.name AS department, " +
+          "r.salary, concat(m.first_name, ' ', m.last_name) AS manager " +
+          "FROM employee AS e LEFT JOIN role AS r ON e.role_id = r.id " +
+          "LEFT JOIN department AS d ON r.department_id = d.id " +
+          "LEFT JOIN employee m ON m.id = e.manager_id " +
+          `WHERE d.id = ${deptId} ORDER BY e.id`;
 
-  inquirer
-    .prompt({
-      name: 'dept',
-      type: 'list',
-      message: 'Select a Department',
-      choices: deptArray, // give it an array
-    })
-    .then((answer) => {
-      query = "SELECT * FROM employee WHERE department = ?";
-      connection.query(query, { department: answer.dept }, (err, res) => {
-        const table = cTable.getTable(res);
-        console.log('\n\n' + table);
-        mainMenu();
-      });
-    })
+          connection.query(query, (err, res) => {
+            if (err) throw err;
+            const table = cTable.getTable(res);
+            if(res[0]) {
+              console.log('\n\n' + table);
+            } else {
+              console.log("\nNo matches found.\n");
+            }
+            mainMenu();
+          });
+        })();
+      })
   })();
 }
 
 // Add an Employee
 const addEmp = () => {
   // these don't work
-  const roleArray = getRoles();
+  const roleArray = getRoles(); // returns pending promise
   console.log(roleArray);
   const managerArray = getManagers();
   inquirer
@@ -214,14 +232,14 @@ const getManagers = () => {
 
 const viewRoles = () => {
   const query = "SELECT title FROM role";
-  const roleArr = [];
-  connection.query(query, (err, res) => {
-    res.forEach((data) => {
-      roleArr.push(data.title);
-    })
-    // inquire here!?
-    console.cTable(roleArr);
-    mainMenu();
+  return new Promise((resolve, reject) => {
+    const query = "SELECT title FROM role";
+    connection.query(query, (err, res) => {
+      if (err) reject(err);
+      const table = cTable.getTable(res);
+      resolve(console.log('\n\n' + table));
+      mainMenu();
+    });
   });
 }
 // praise be to stackoverflow
@@ -241,10 +259,10 @@ function getRoles() {
 function getDepartments() {
   const deptArr = [];
   return new Promise((resolve, reject) => {
-    const query = "SELECT name FROM department";
+    const query = "SELECT id, name FROM department";
     connection.query(query, (err, res) => {
       res.forEach((data) => {
-        deptArr.push(data.name);
+        deptArr.push({id:data.id, name:data.name});
       })
       return err ? reject(err) : resolve(deptArr);
     });
@@ -254,4 +272,13 @@ function getDepartments() {
 function doAThing() {
   console.log("\nNot yet implemented\n");
   mainMenu();
+}
+
+function getDeptId(deptName) {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT id FROM department WHERE name = ?";
+    connection.query(query, deptName, (err, res) => {
+      return err ? reject(err) : resolve(res[0].id);
+    });
+  });
 }
