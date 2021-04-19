@@ -57,10 +57,10 @@ const mainMenu = () => {
           addEmp();
           break;
         case 'Remove Employee': // Bonus
-          doAThing();
+          destroyEmployee();
           break;
         case 'Update Employee Role':
-          doAThing();
+          updateEmpRole();
           break;
         case 'Update Employee Manager': // Bonus
           doAThing();
@@ -178,9 +178,14 @@ const viewAllEmpByManager = () => {
 }
 
 // Add an Employee
-const addEmp = () => {
+function addEmp() {
   (async () => {
-    const roleArray = await getRoles();
+    const roleArray = await getRoles(); // gets role title AND id
+    // new array for role titles ONLY
+    const roleTitles = [];
+    roleArray.forEach((element) => {
+      roleTitles.push(element.title);
+    })
     const managerArray = await getManagers();
     managerArray.unshift('None'); // Adds None to the array as an option
     inquirer
@@ -198,13 +203,13 @@ const addEmp = () => {
           type: 'list',
           name: 'role',
           message: 'What is the employee\'s role?',
-          choices: roleArray, // to >> role.title
+          choices: roleTitles,
         },
         {
           type: 'list',
           name: 'manager',
           message: 'Who is the employee\'s manager?',
-          choices: managerArray, // answer needs to be converted to e.id
+          choices: managerArray,
         }
       ])
       .then((answer) => {
@@ -213,7 +218,7 @@ const addEmp = () => {
           const managerId = await getIdByName(answer.manager);
           // gets id of argued role
           const roleId = await getRoleIdByTitle(answer.role);
-          if (managerId === '') {
+          if (managerId === '') { // no manager selected
             const query = "INSERT INTO employee (first_name, last_name, role_id) "
               + "VALUES (?, ?, ?)";
             connection.query(query, [answer.firstN, answer.lastN, roleId], (err, res) => {
@@ -221,7 +226,7 @@ const addEmp = () => {
               console.log(`\nAdded ${answer.firstN + ' ' + answer.lastN} to the database\n`);
               mainMenu();
             });
-          } else if (!isNaN(managerId)){
+          } else if (!isNaN(managerId)){ // manager selected
             const query = "INSERT INTO employee (first_name, last_name, role_id, manager_id) "
               + "VALUES (?, ?, ?, ?)"
             connection.query(query, [answer.firstN, answer.lastN, roleId, managerId], (err, res) => {
@@ -236,7 +241,48 @@ const addEmp = () => {
 
 }
 
-const addRole = () => {
+function destroyEmployee() {
+  (async() => {
+    const empList = await getEmployees();
+    if(empList.length > 7)
+      empList.push(new inquirer.Separator());
+    inquirer
+      .prompt({
+        type: 'list',
+        name: 'employee',
+        message: 'Which employee do you want to remove?',
+        choices: empList,
+      })
+      .then((answer) => {
+        let empId;
+        for (let i = 0; i < empList.length; i++) {
+          if (empList[i].name === answer.employee) {
+            empId = empList[i].id;
+            break;
+          }
+        }
+        const query = "DELETE FROM employee WHERE id = ?";
+        connection.query(query, empId, (err, res) => {
+          if (err) throw err;
+          console.log("\nRemoved employee from the database\n");
+          mainMenu();
+        })
+      })
+  })();
+}
+
+// returns (promise) array of employees (name, id)
+const getEmployees = () => {
+  return new Promise((resolve, reject) => {
+    const query = "SELECT concat(first_name, ' ', last_name) AS name, "
+    + "id FROM employee";
+    connection.query(query, (err, res) => {
+      return err ? reject(err) : resolve(res);
+    });
+  })
+}
+
+function addRole() {
   (async() => {
     // get array of departments
     const deptArr = await getDepartments();
@@ -300,14 +346,65 @@ const getManagers = () => {
 }
 
 const updateEmpRole = () => {
-  // get an array of employees
-  // get an array of roles
-  // promp which employee
-  // prompt which role
-  // update role
+  (async() => {
+    // get an array of employees
+    const empArr = await getEmployees(); // name, id
+    if (empArr.length > 7)
+      empArr.push(new inquirer.Separator());
+    // get an array of roles
+    const roleArr = await getRoles(); // title, id (shows undefined in choices)
+    // get role titles in their own array for 'choices'
+    const roleTitles = [];
+    roleArr.forEach((element) => {
+      roleTitles.push(element.title);
+    })
+    if (roleTitles.length > 7)
+      roleTitles.push(new inquirer.Separator());
+    // prompt for employee name and updated role
+    inquirer
+      .prompt([
+        {
+          type: 'list',
+          name: 'employee',
+          message: 'Which employee would you like to update the role for?',
+          choices: empArr,
+        },
+        {
+          type: 'list',
+          name: 'role',
+          message: 'Which role would you like to assign them to?',
+          choices: roleTitles,
+        }
+      ]).then((answers) => {
+        const empName = answers.employee;
+        const empRole = answers.role;
+        let empId; // id of selected employee
+        let roleId; // (role)id of user selected role
+        for (let i = 0; i < empArr.length; i++) {
+          if (empArr[i].name === answers.employee) {
+            empId = empArr[i].id;
+            break;
+          }
+        }
+        for (let i = 0; i < empRole.length; i++) {
+          if (roleArr[i].title === answers.role) {
+            roleId = roleArr[i].id;
+            break;
+          }
+        }
+        // update role
+        const query = "UPDATE employee SET role_id = ? WHERE "
+        + "id = ?";
+        connection.query(query, [roleId, empId], (err, res) => {
+          if (err) throw err;
+          console.log(`\nSuccessfully updated ${empName}'s role to ${answers.role}\n`);
+          mainMenu();
+        })
+      })
+  })();
 }
 
-const viewRoles = () => {
+function viewRoles() {
     const query = "SELECT title FROM role";
     connection.query(query, (err, res) => {
       if (err) throw(err);
@@ -317,15 +414,11 @@ const viewRoles = () => {
     });
 }
 
-function getRoles() {
-  const roleArr = [];
+const getRoles = () => {
   return new Promise((resolve, reject) => {
-    const query = "SELECT title FROM role";
+    const query = "SELECT title, id FROM role";
     connection.query(query, (err, res) => {
-      res.forEach((data) => {
-        roleArr.push(data.title);
-      })
-      return err ? reject(err) : resolve(roleArr);
+      return err ? reject(err) : resolve(res);
     });
   })
 }
@@ -360,7 +453,7 @@ function viewDepartments() {
     });
 }
 
-function getDepartments() {
+const getDepartments = () => {
   const deptArr = [];
   return new Promise((resolve, reject) => {
     const query = "SELECT id, name FROM department";
@@ -411,3 +504,4 @@ function getDeptIdByName(name) {
     });
   });
 }
+

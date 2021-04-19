@@ -4,6 +4,7 @@
   "description": "An employee manager command-line application that modifies information stored in a mysql database.",
   "main": "employee-tracker.js",
   "scripts": {
+    "start": "node employee-tracker",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
