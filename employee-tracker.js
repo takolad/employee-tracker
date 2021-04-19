@@ -63,7 +63,7 @@ const mainMenu = () => {
           updateEmpRole();
           break;
         case 'Update Employee Manager': // Bonus
-          doAThing();
+          updateEmpManager();
           break;
         case 'View All Roles':
           viewRoles();
@@ -401,6 +401,58 @@ const updateEmpRole = () => {
           mainMenu();
         })
       })
+  })();
+}
+
+const updateEmpManager = () => {
+  (async() => {
+    // get an array of employees
+    const empArr = await getEmployees(); // name, id
+    if (empArr.length > 7)
+      empArr.push(new inquirer.Separator());
+    
+    // prompt for employee name and updated manager
+    let employeeName;
+    inquirer
+      .prompt(
+        {
+          type: 'list',
+          name: 'employee',
+          message: "Which employee's manager do you want to update?",
+          choices: empArr,
+        })
+        .then((answer) => {
+          employeeName = answer.employee;
+          const potentialManagers = empArr.filter(e => e.name !== answer.employee);
+          inquirer
+            .prompt(
+              {
+                type: 'list',
+                name: 'manager',
+                message: 'Which employee do you want to set as manager for the selected employee?',
+                choices: potentialManagers,
+              })
+              .then((answer) => {
+                (async() => {
+                  let empId; // id of selected employee
+                  for (let i = 0; i < empArr.length; i++) {
+                    if (empArr[i].name === employeeName) {
+                      empId = empArr[i].id;
+                      break;
+                    }
+                  }
+                  const managerId = await getIdByName(answer.manager);
+                  // update manager
+                  const query = "UPDATE employee SET manager_id = ? WHERE "
+                  + "id = ?";
+                  connection.query(query, [ managerId, empId ], (err, res) => {
+                    if (err) throw err;
+                    console.log(`\nUpdated employee's manager\n`);
+                    mainMenu();
+                  })
+                })();
+              })
+        })
   })();
 }
 
