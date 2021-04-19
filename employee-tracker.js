@@ -78,7 +78,7 @@ const mainMenu = () => {
           viewDepartments();
           break;
         case 'Add Department':
-          doAThing();
+          addDepartment();
           break;
         case 'Remove Department': // Bonus
           doAThing();
@@ -299,6 +299,14 @@ const getManagers = () => {
   })
 }
 
+const updateEmpRole = () => {
+  // get an array of employees
+  // get an array of roles
+  // promp which employee
+  // prompt which role
+  // update role
+}
+
 const viewRoles = () => {
     const query = "SELECT title FROM role";
     connection.query(query, (err, res) => {
@@ -320,6 +328,23 @@ function getRoles() {
       return err ? reject(err) : resolve(roleArr);
     });
   })
+}
+
+const addDepartment = () => {
+  inquirer
+    .prompt({
+      type: 'input',
+      name: 'dept',
+      message: 'What department would you like to add?'
+    })
+    .then((answer) => {
+      const query = 'INSERT INTO department (name) VALUE (?)'
+      connection.query(query, answer.dept, (err, res) => {
+        if (err) throw err;
+        console.log(`\nSuccessfully added ${answer.dept} to the database\n`);
+        mainMenu();
+      });
+    });
 }
 
 function viewDepartments() {
