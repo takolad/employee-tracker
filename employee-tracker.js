@@ -84,7 +84,7 @@ const mainMenu = () => {
           destroyDepartment();
           break;
         case 'View Utilized Department Budget By Department': // Bonus
-          // doAThing();
+          viewDeptBudget();
           break;
         default:
           console.log(`Invalid action: ${answer.action}`);
@@ -574,9 +574,32 @@ const getDepartments = () => {
   });
 }
 
-function doAThing() {
-  console.log("\nNot yet implemented\n");
-  mainMenu();
+function viewDeptBudget() {
+  (async() => {
+    const deptArray = await getDepartments();
+
+    inquirer
+      .prompt({
+        type: 'list',
+        name: 'department',
+        message: "Select a department to view it's utilized budget",
+        choices: deptArray
+      }).then((answer) => {
+        (async() => {
+          const deptId = await getDeptIdByName(answer.department);
+          const query = "SELECT SUM(r.salary) AS 'Total Utilized Budget' "
+          + "FROM role AS r "
+          + "JOIN employee AS e ON r.id = e.role_id "
+          + "WHERE r.department_id = ?";
+          connection.query(query, deptId, (err, res) => {
+            if (err) throw err;
+            const table = cTable.getTable(res);
+            console.log(table);
+            mainMenu();
+          })
+        })();
+      })
+  })();
 }
 
 // returns id of matching name or empty string if None is selected
