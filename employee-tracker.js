@@ -81,7 +81,7 @@ const mainMenu = () => {
           addDepartment();
           break;
         case 'Remove Department': // Bonus
-          doAThing();
+          destroyDepartment();
           break;
         case 'View Utilized Department Budget By Department': // Bonus
           doAThing();
@@ -490,6 +490,32 @@ const addDepartment = () => {
         mainMenu();
       });
     });
+}
+
+const destroyDepartment = () => {
+  (async() => {
+    const deptArray = await getDepartments();
+
+    inquirer
+      .prompt({
+        type: 'list',
+        name: 'department',
+        message: 'Which department would you like to remove?',
+        choices: deptArray
+      })
+      .then((answer) => {
+        (async() => {
+          const deptId = await getDeptIdByName(answer.department);
+
+          const query = "DELETE FROM department WHERE id = ?";
+          connection.query(query, deptId, (err, res) => {
+            if (err) throw err;
+            console.log('\nRemoved department from database.\n');
+            mainMenu();
+          })
+        })();
+      })
+  })();
 }
 
 function viewDepartments() {
