@@ -56,13 +56,13 @@ const mainMenu = () => {
         case 'Add Employee':
           addEmp();
           break;
-        case 'Remove Employee': // Bonus
+        case 'Remove Employee':
           destroyEmployee();
           break;
         case 'Update Employee Role':
           updateEmpRole();
           break;
-        case 'Update Employee Manager': // Bonus
+        case 'Update Employee Manager':
           updateEmpManager();
           break;
         case 'View All Roles':
@@ -71,8 +71,8 @@ const mainMenu = () => {
         case 'Add Role':
           addRole();
           break;
-        case 'Remove Role': // Bonus
-          doAThing();
+        case 'Remove Role':
+          destroyRole();
           break;
         case 'View All Departments':
           viewDepartments();
@@ -80,11 +80,11 @@ const mainMenu = () => {
         case 'Add Department':
           addDepartment();
           break;
-        case 'Remove Department': // Bonus
+        case 'Remove Department':
           destroyDepartment();
           break;
         case 'View Utilized Department Budget By Department': // Bonus
-          doAThing();
+          // doAThing();
           break;
         default:
           console.log(`Invalid action: ${answer.action}`);
@@ -326,6 +326,36 @@ function addRole() {
             });
           })();
         }
+      })
+  })();
+}
+
+const destroyRole = () => {
+  (async() => {
+    const roleArray = await getRoles(); // title, id
+
+    // makes a new array with 'name' instead of 'title' as first key
+    const roles = roleArray.map(({ title: name, ...rest }) => ({
+      name, ...rest
+    }));
+
+    inquirer
+      .prompt({
+        type: 'list',
+        name: 'role',
+        message: 'Which role would you like to remove?',
+        choices: roles
+      }).then((answer) => {
+        (async () => {
+          const roleId = await getRoleIdByTitle(answer.role);
+
+          const query = "DELETE FROM role WHERE id = ?";
+          connection.query(query, roleId, (err, res) => {
+            if (err) throw err;
+            console.log("\nRemoved role from the database\n");
+            mainMenu();
+          })
+        })();
       })
   })();
 }
