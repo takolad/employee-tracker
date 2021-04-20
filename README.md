@@ -26,6 +26,9 @@ Navigate the menu with the `arrow` keys and press `enter` to make a selection.
    ![View Departments](./assets/img2.png)
    ![Add Employee](./assets/img3.png)
 
+## Links
+   [Demonstration Video](https://drive.google.com/file/d/1rXZiSQCESwKmk9AjySs8Bpy1MEkOm9vS/view?usp=sharing)
+
 ## License
 
    ![MIT License Badge](https://img.shields.io/badge/License-MIT-yellow.svg)
